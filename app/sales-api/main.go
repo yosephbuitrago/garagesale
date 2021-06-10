@@ -14,6 +14,7 @@ import (
 
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
+	"github.com/yosephbuitrago/garagesale/app/sales-api/handlers"
 )
 
 // build is the git version of this program. It is set using build flags in the makefile.
@@ -108,8 +109,8 @@ func run(log *log.Logger) error {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 	api := http.Server{
-		Addr: cfg.Web.APIHost,
-		// Handler:      handlers.API(build, shutdown, log, auth, db),
+		Addr:         cfg.Web.APIHost,
+		Handler:      handlers.API(build, shutdown, log),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
 	}
