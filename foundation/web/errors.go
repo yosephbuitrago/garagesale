@@ -17,7 +17,7 @@ type ErrorResponse struct {
 type Error struct {
 	Err    error
 	Status int
-	Fields error
+	Fields []FieldError
 }
 
 // NewRequestError wraps a provided error with an HTTP status code. This

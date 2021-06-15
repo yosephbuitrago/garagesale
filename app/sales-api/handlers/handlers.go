@@ -7,18 +7,19 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/yosephbuitrago/garagesale/business/mid"
 	"github.com/yosephbuitrago/garagesale/foundation/web"
 )
 
 // API constructs an http.Handler with all application routes defined.
 func API(build string, shutdown chan os.Signal, log *log.Logger) *web.App {
 
-	tm := web.NewApp(shutdown)
+	tm := web.NewApp(shutdown, mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics(log))
 
 	check := check{
 		log: log,
 	}
 
-	tm.Handle(http.MethodGet, "/test", check.readiness)
+	tm.Handle(http.MethodGet, "/readiness", check.readiness)
 	return tm
 }

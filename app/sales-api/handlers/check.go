@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"log"
+	"math/rand"
 	"net/http"
+
+	"github.com/yosephbuitrago/garagesale/foundation/web"
 )
 
 type check struct {
@@ -12,14 +14,15 @@ type check struct {
 }
 
 func (c check) readiness(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	// func (c check) readiness(w http.ResponseWriter, r *http.Request) {
-
+	if n := rand.Intn(100); n%2 == 0 {
+		// return errors.New("untrusted error")
+		// return web.NewRequestError(errors.New("bad request"), http.StatusBadRequest)
+		panic("panic")
+	}
 	status := struct {
 		Status string
 	}{
 		Status: "OK",
 	}
-	json.NewEncoder(w).Encode(status)
-	log.Println(r, status)
-	return nil
+	return web.Respond(ctx, w, status, http.StatusOK)
 }
