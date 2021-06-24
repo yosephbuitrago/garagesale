@@ -22,7 +22,7 @@ func main() {
 }
 
 func gentoken() {
-	privatePEM, err := ioutil.ReadFile("/home/yoseph/workspace/github.com/yosephbuitrago/garagesale/private.pem")
+	privatePEM, err := ioutil.ReadFile("/Users/yosephbuitrago/github/garagesale/private.pem")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func gentoken() {
 
 	method := jwt.GetSigningMethod("RS256")
 	token := jwt.NewWithClaims(method, claims)
-	token.Header["kid"] = "72635462-2j34bj2b-234bj23"
+	token.Header["kid"] = "54bb2165-71e1-41a6-af3e-7da4a0e1e2c1"
 	str, err := token.SignedString(privateKey)
 	if err != nil {
 		log.Fatal(err)
