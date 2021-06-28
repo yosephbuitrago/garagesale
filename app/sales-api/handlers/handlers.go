@@ -7,19 +7,20 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/yosephbuitrago/garagesale/business/auth"
 	"github.com/yosephbuitrago/garagesale/business/mid"
 	"github.com/yosephbuitrago/garagesale/foundation/web"
 )
 
 // API constructs an http.Handler with all application routes defined.
-func API(build string, shutdown chan os.Signal, log *log.Logger, a *auth.Auth) *web.App {
+func API(build string, shutdown chan os.Signal, log *log.Logger, db *sqlx.DB, a *auth.Auth) *web.App {
 
 	tm := web.NewApp(shutdown, mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panics(log))
 
-	check := check{
+	check := checkGroup{
 		build: build,
-		log:   log,
+		db:    db,
 	}
 
 	tm.Handle(http.MethodGet, "/readiness", check.readiness)

@@ -12,12 +12,15 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/yosephbuitrago/garagesale/business/data/schema"
+	"github.com/yosephbuitrago/garagesale/foundation/database"
 )
 
 func main() {
 
 	// genkey()
-	gentoken()
+	// gentoken()
+	Migrate()
 
 }
 
@@ -129,4 +132,28 @@ func genkey() {
 	}
 
 	fmt.Println("private and public key files generated")
+}
+
+// Migrate creates the schema in the database.
+func Migrate() error {
+
+	cfg := database.Config{
+		User:       "postgres",
+		Password:   "postgres",
+		Host:       "0.0.0.0",
+		Name:       "postgres",
+		DisableTLS: true,
+	}
+	db, err := database.Open(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := schema.Migrate(db); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("migrations complete")
+	return nil
 }
