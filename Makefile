@@ -47,6 +47,7 @@ sales-api:
 
 kind-up:
 	kind create cluster --image kindest/node:v1.19.1 --name yoseph-starter-cluster --config zarf/k8s/dev/kind-config.yaml
+	kind load docker-image postgres:13-alpine --name yoseph-starter-cluster
 
 kind-down:
 	kind delete cluster --name yoseph-starter-cluster
