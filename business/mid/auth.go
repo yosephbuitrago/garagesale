@@ -9,6 +9,7 @@ import (
 
 	"github.com/yosephbuitrago/garagesale/business/auth"
 	"github.com/yosephbuitrago/garagesale/foundation/web"
+	"go.opentelemetry.io/otel"
 )
 
 // Authenticate validates a JWT from the `Authorization` header.
@@ -19,6 +20,9 @@ func Authenticate(a *auth.Auth) web.Middleware {
 
 		// Create the handler that will be attached in the middleware chain.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+			tr := otel.GetTracerProvider().Tracer("business.mid.authenticate")
+			_, span := tr.Start(ctx, "authenticate")
+			defer span.End()
 			// Expecting: bearer <token>
 			authStr := r.Header.Get("authorization")
 
@@ -54,6 +58,9 @@ func Authorize(roles ...string) web.Middleware {
 
 		// Create the handler that will be attached in the middleware chain.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+			tr := otel.GetTracerProvider().Tracer("business.mid.authorize")
+			_, span := tr.Start(ctx, "authorize")
+			defer span.End()
 			// If the context is missing this value return failure.
 			claims, ok := ctx.Value(auth.Key).(auth.Claims)
 			if !ok {

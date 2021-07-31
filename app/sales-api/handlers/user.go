@@ -1,0 +1,180 @@
+package handlers
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/pkg/errors"
+	"github.com/yosephbuitrago/garagesale/business/auth"
+	"github.com/yosephbuitrago/garagesale/business/data/user"
+	"github.com/yosephbuitrago/garagesale/foundation/web"
+	"go.opentelemetry.io/otel/trace"
+)
+
+type userGroup struct {
+	user user.User
+	auth *auth.Auth
+}
+
+func (ug userGroup) query(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	span := trace.SpanFromContext(ctx)
+	defer span.End()
+
+	v, ok := ctx.Value(web.KeyValues).(*web.Values)
+	if !ok {
+		return web.NewShutdownError("web value missing from context")
+	}
+
+	users, err := ug.user.Query(ctx, v.TraceID)
+	if err != nil {
+		return err
+	}
+
+	return web.Respond(ctx, w, users, http.StatusOK)
+
+}
+
+func (ug userGroup) queryByID(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+
+	v, ok := ctx.Value(web.KeyValues).(*web.Values)
+	if !ok {
+		return web.NewShutdownError("web value missing from context")
+	}
+
+	claims, ok := ctx.Value(auth.Key).(auth.Claims)
+	if !ok {
+		return errors.New("claims missing from context")
+	}
+
+	params := web.Params(r)
+	usr, err := ug.user.QueryByID(ctx, v.TraceID, claims, params["id"])
+	if err != nil {
+		switch err {
+		case user.ErrInvalidID:
+			return web.NewRequestError(err, http.StatusBadRequest)
+		case user.ErrNotFound:
+			return web.NewRequestError(err, http.StatusNotFound)
+		case user.ErrForbidden:
+			return web.NewRequestError(err, http.StatusForbidden)
+		default:
+			return errors.Wrapf(err, "Id: %s", params["id"])
+		}
+	}
+
+	return web.Respond(ctx, w, usr, http.StatusOK)
+}
+
+func (ug userGroup) create(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+
+	v, ok := ctx.Value(web.KeyValues).(*web.Values)
+	if !ok {
+		return web.NewShutdownError("web value missing from context")
+	}
+
+	var nu user.NewUser
+	if err := web.Decode(r, &nu); err != nil {
+		return errors.Wrap(err, "")
+	}
+
+	usr, err := ug.user.Create(ctx, v.TraceID, nu, v.Now)
+	if err != nil {
+		return errors.Wrapf(err, "User: %+v", &usr)
+	}
+
+	return web.Respond(ctx, w, usr, http.StatusCreated)
+}
+
+func (ug userGroup) update(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	v, ok := ctx.Value(web.KeyValues).(*web.Values)
+	if !ok {
+		return web.NewShutdownError("web value missing from context")
+	}
+
+	claims, ok := ctx.Value(auth.Key).(auth.Claims)
+	if !ok {
+		return errors.New("claims missing from context")
+	}
+
+	var upd user.UpdateUser
+	if err := web.Decode(r, &upd); err != nil {
+		return errors.Wrap(err, "")
+	}
+
+	params := web.Params(r)
+	err := ug.user.Update(ctx, v.TraceID, claims, params["id"], upd, v.Now)
+	if err != nil {
+		switch err {
+		case user.ErrInvalidID:
+			return web.NewRequestError(err, http.StatusBadRequest)
+		case user.ErrNotFound:
+			return web.NewRequestError(err, http.StatusNotFound)
+		case user.ErrForbidden:
+			return web.NewRequestError(err, http.StatusForbidden)
+		default:
+			return errors.Wrapf(err, "ID: %s  User: %+v", params["id"], &upd)
+		}
+	}
+
+	return web.Respond(ctx, w, nil, http.StatusNoContent)
+}
+
+func (ug userGroup) delete(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+
+	v, ok := ctx.Value(web.KeyValues).(*web.Values)
+	if !ok {
+		return web.NewShutdownError("web value missing from context")
+	}
+
+	params := web.Params(r)
+	err := ug.user.Delete(ctx, v.TraceID, params["id"])
+	if err != nil {
+		switch err {
+		case user.ErrInvalidID:
+			return web.NewRequestError(err, http.StatusBadRequest)
+		case user.ErrNotFound:
+			return web.NewRequestError(err, http.StatusNotFound)
+		case user.ErrForbidden:
+			return web.NewRequestError(err, http.StatusForbidden)
+		default:
+			return errors.Wrapf(err, "Id: %s", params["id"])
+		}
+	}
+
+	return web.Respond(ctx, w, nil, http.StatusNoContent)
+}
+
+func (ug userGroup) token(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+
+	v, ok := ctx.Value(web.KeyValues).(*web.Values)
+	if !ok {
+		return web.NewShutdownError("web value missing from context")
+	}
+
+	email, pass, ok := r.BasicAuth()
+	if !ok {
+		err := errors.New("must provide email and password in Basic auth")
+		return web.NewRequestError(err, http.StatusUnauthorized)
+	}
+
+	claims, err := ug.user.Authenticate(ctx, v.TraceID, v.Now, email, pass)
+	if err != nil {
+		switch err {
+		case user.ErrAuthenticationFailure:
+			return web.NewRequestError(err, http.StatusUnauthorized)
+		default:
+			return errors.Wrap(err, "authenticating")
+		}
+	}
+
+	params := web.Params(r)
+
+	var tkn struct {
+		Token string `json:"token"`
+	}
+	tkn.Token, err = ug.auth.GenerateToken(params["kid"], claims)
+	if err != nil {
+		return errors.Wrap(err, "generating token")
+	}
+
+	return web.Respond(ctx, w, tkn, http.StatusOK)
+}

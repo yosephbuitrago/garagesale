@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/dimfeld/httptreemux/v5"
-	"github.com/google/uuid"
+	othttp "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ctxKey represents the type of value for the context key.
@@ -32,7 +34,8 @@ type Handler func(ctx context.Context, w http.ResponseWriter, r *http.Request) e
 // object for each of our http handlers. Feel free to add any configuration
 // data/logic on this App struct.
 type App struct {
-	*httptreemux.ContextMux
+	mux      *httptreemux.ContextMux
+	otmux    http.Handler
 	shutdown chan os.Signal
 	mw       []Middleware
 }
@@ -40,10 +43,19 @@ type App struct {
 // NewApp creates an App value that handle a set of routes for the application.
 func NewApp(shutdown chan os.Signal, mw ...Middleware) *App {
 
+	// Create an OpenTelemetry HTTP Handler which wraps the router. This will start
+	// the initial span and annotate it with information about the request/response.
+	//
+	// This is configured to use the W3C TraceContext standard to set the remote
+	// parent if an client request includes the appropriate headers.
+	// https://w3c.github.io/trace-context/
+
+	mux := httptreemux.NewContextMux()
 	app := App{
-		ContextMux: httptreemux.NewContextMux(),
-		shutdown:   shutdown,
-		mw:         mw,
+		mux:      mux,
+		otmux:    othttp.NewHandler(mux, "request"),
+		shutdown: shutdown,
+		mw:       mw,
 	}
 	return &app
 }
@@ -55,21 +67,27 @@ func (a *App) SignalShutdown() {
 }
 
 func (a *App) Handle(method string, path string, handler Handler, mw ...Middleware) {
+	// First wrap handler specific middleware around this handler.
+	handler = wrapMiddleware(mw, handler)
+
+	// Add the application's general middleware to the handler chain.
+	handler = wrapMiddleware(a.mw, handler)
+
 	h := func(w http.ResponseWriter, r *http.Request) {
 
-		// First wrap handler specific middleware around this handler.
-		handler = wrapMiddleware(mw, handler)
-
-		// Add the application's general middleware to the handler chain.
-		handler = wrapMiddleware(a.mw, handler)
+		// Start or expand a distributed trace.
+		ctx := r.Context()
+		tr := otel.GetTracerProvider().Tracer("handler")
+		ctx, span := tr.Start(ctx, "handler", trace.WithSpanKind(trace.SpanKindServer))
+		defer span.End()
 
 		// Set the context with the required values to
 		// process the request.
 		v := Values{
-			TraceID: uuid.New().String(),
+			TraceID: span.SpanContext().TraceID().String(),
 			Now:     time.Now(),
 		}
-		ctx := context.WithValue(r.Context(), KeyValues, &v)
+		ctx = context.WithValue(ctx, KeyValues, &v)
 		if err := handler(ctx, w, r); err != nil {
 			a.SignalShutdown()
 			return
@@ -77,5 +95,13 @@ func (a *App) Handle(method string, path string, handler Handler, mw ...Middlewa
 
 	}
 
-	a.ContextMux.Handle(method, path, h)
+	a.mux.Handle(method, path, h)
+}
+
+// ServeHTTP implements the http.Handler interface. It's the entry point for
+// all http traffic and allows the opentelemetry mux to run first to handle
+// tracing. The opentelemetry mux then calls the application mux to handle
+// application traffic. This was setup on line 57 in the NewApp function.
+func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.otmux.ServeHTTP(w, r)
 }

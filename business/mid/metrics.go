@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/yosephbuitrago/garagesale/foundation/web"
+	"go.opentelemetry.io/otel"
 )
 
 // m contains the global program counters for the application.
@@ -28,6 +29,9 @@ func Metrics() web.Middleware {
 
 		// Create the handler that will be attached in the middleware chain.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+			tr := otel.GetTracerProvider().Tracer("business.mid.metrics")
+			_, span := tr.Start(ctx, "metrics")
+			defer span.End()
 
 			err := handler(ctx, w, r)
 

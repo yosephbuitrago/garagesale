@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/pkg/errors"
 	"github.com/yosephbuitrago/garagesale/business/data/schema"
 	"github.com/yosephbuitrago/garagesale/foundation/database"
 )
@@ -153,6 +154,12 @@ func Migrate() error {
 	if err := schema.Migrate(db); err != nil {
 		log.Fatal(err)
 	}
+
+	if err := schema.Seed(db); err != nil {
+		return errors.Wrap(err, "seed database")
+	}
+
+	fmt.Println("seed data complete")
 
 	fmt.Println("migrations complete")
 	return nil

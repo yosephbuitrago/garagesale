@@ -20,6 +20,12 @@ import (
 	"github.com/yosephbuitrago/garagesale/app/sales-api/handlers"
 	"github.com/yosephbuitrago/garagesale/business/auth"
 	"github.com/yosephbuitrago/garagesale/foundation/database"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/zipkin"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
 // build is the git version of this program. It is set using build flags in the makefile.
@@ -49,7 +55,7 @@ func run(log *log.Logger) error {
 			ShutdownTimeout time.Duration `conf:"default:5s"`
 		}
 		Auth struct {
-			KeyID          string `conf:"default:54bb2165-71e1-41a6-af3e-7da4a0e1e2c1"`
+			KeyID          string `conf:"default:5cf37266-3473-4006-984f-9325122678b7"`
 			PrivateKeyFile string `conf:"default:/service/private.pem"`
 			Algorithm      string `conf:"default:RS256"`
 		}
@@ -59,6 +65,11 @@ func run(log *log.Logger) error {
 			Host       string `conf:"default:db"`
 			Name       string `conf:"default:postgres"`
 			DisableTLS bool   `conf:"default:true"`
+		}
+		Zipkin struct {
+			ReporterURI string  `conf:"default:http://zipkin:9411/api/v2/spans"`
+			ServiceName string  `conf:"default:sales-api"`
+			Probability float64 `conf:"default:0.05"`
 		}
 	}
 
@@ -146,6 +157,42 @@ func run(log *log.Logger) error {
 		db.Close()
 	}()
 
+	// =========================================================================
+	// Start Tracing Support
+
+	// WARNING: The current Init settings are using defaults which may not be
+	// compatible with your project. Please review the documentation for
+	// opentelemetry.
+
+	log.Println("startup", "status", "initializing OT/Zipkin tracing support")
+
+	exporter, err := zipkin.New(
+		cfg.Zipkin.ReporterURI,
+		// zipkin.WithLogger(zap.NewStdLog(log)),
+	)
+	if err != nil {
+		return errors.Wrap(err, "creating new exporter")
+	}
+
+	traceProvider := trace.NewTracerProvider(
+		trace.WithSampler(trace.TraceIDRatioBased(cfg.Zipkin.Probability)),
+		trace.WithBatcher(exporter,
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+			trace.WithBatchTimeout(trace.DefaultBatchTimeout),
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+		),
+		trace.WithResource(
+			resource.NewWithAttributes(
+				semconv.SchemaURL,
+				semconv.ServiceNameKey.String(cfg.Zipkin.ServiceName),
+				attribute.String("exporter", "zipkin"),
+			),
+		),
+	)
+
+	// I can only get this working properly using the singleton :(
+	otel.SetTracerProvider(traceProvider)
+	defer traceProvider.Shutdown(context.Background())
 	// =========================================================================
 	// Start Debug Service
 	//

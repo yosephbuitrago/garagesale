@@ -8,7 +8,7 @@ SHELL=/bin/bash
 # openssl rsa -pubout -in private.pem -out public.pem
 # ./sales-admin genkey
 
-# curl --user "admin@example.com:gophers" http://localhost:3000/v1/users/token/54bb2165-71e1-41a6-af3e-7da4a0e1e2c1
+# curl --user "admin@example.com:gophers" http://localhost:3000/v1/users/token/5cf37266-3473-4006-984f-9325122678b7
 # export TOKEN="COPY TOKEN STRING FROM LAST CALL"
 # curl -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/v1/users
 

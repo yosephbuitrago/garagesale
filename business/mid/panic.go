@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/yosephbuitrago/garagesale/foundation/web"
+	"go.opentelemetry.io/otel"
 )
 
 // Panics recovers from panics and converts the panic to an error so it is
@@ -19,7 +20,9 @@ func Panics(log *log.Logger) web.Middleware {
 
 		// Create the handler that will be attached in the middleware chain.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) (err error) {
-
+			tr := otel.GetTracerProvider().Tracer("business.mid.panic")
+			_, span := tr.Start(ctx, "panic")
+			defer span.End()
 			// If the context is missing this value, request the service
 			// to be shutdown gracefully.
 			v, ok := ctx.Value(web.KeyValues).(*web.Values)
