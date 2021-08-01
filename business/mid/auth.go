@@ -58,6 +58,7 @@ func Authorize(roles ...string) web.Middleware {
 
 		// Create the handler that will be attached in the middleware chain.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+
 			tr := otel.GetTracerProvider().Tracer("business.mid.authorize")
 			_, span := tr.Start(ctx, "authorize")
 			defer span.End()

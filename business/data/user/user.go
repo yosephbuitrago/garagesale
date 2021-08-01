@@ -150,12 +150,13 @@ func (u User) Delete(ctx context.Context, traceID string, userID string) error {
 
 // Query retrieves a list of existing users from the database.
 func (u User) Query(ctx context.Context, traceID string) ([]Info, error) {
+
 	tr := otel.GetTracerProvider().Tracer("business.data.query")
 	_, span := tr.Start(ctx, "user")
 	defer span.End()
 	const q = `SELECT * FROM users`
 
-	log.Printf("%s : %s : query : %s", traceID, "user.Query",
+	u.log.Printf("%s : %s : query : %s", traceID, "user.Query",
 		database.Log(q),
 	)
 

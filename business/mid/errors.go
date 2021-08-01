@@ -19,6 +19,7 @@ func Errors(log *log.Logger) web.Middleware {
 
 		// Create the handler that will be attached in the middleware chain.
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+
 			tr := otel.GetTracerProvider().Tracer("business.mid.error")
 			_, span := tr.Start(ctx, "error")
 			defer span.End()
