@@ -9,6 +9,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/yosephbuitrago/garagesale/business/auth"
+	"github.com/yosephbuitrago/garagesale/business/data/product"
 	"github.com/yosephbuitrago/garagesale/business/data/user"
 	"github.com/yosephbuitrago/garagesale/business/mid"
 	"github.com/yosephbuitrago/garagesale/foundation/web"
@@ -38,6 +39,14 @@ func API(build string, shutdown chan os.Signal, log *log.Logger, db *sqlx.DB, a 
 	app.Handle(http.MethodPut, "/v1/users/:id", ug.update, mid.Authenticate(a), mid.Authorize(auth.RoleAdmin))
 	app.Handle(http.MethodDelete, "/v1/users/:id", ug.delete, mid.Authenticate(a), mid.Authorize(auth.RoleAdmin))
 	app.Handle(http.MethodGet, "/v1/users/token/:kid", ug.token)
+
+	// Register products endpoints
+	pg := productGroup{
+		product: product.New(log, db),
+	}
+
+	app.Handle(http.MethodGet, "/v1/products", pg.create, mid.Authenticate(a))
+	app.Handle(http.MethodPost, "/v1/products", pg.create, mid.Authenticate(a))
 
 	return app
 }
